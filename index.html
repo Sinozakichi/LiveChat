@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket Chat</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        #chat {
+            border: 1px solid #ccc;
+            padding: 10px;
+            height: 300px;
+            overflow-y: scroll;
+            margin-bottom: 10px;
+        }
+        #messageInput {
+            width: calc(100% - 100px);
+            padding: 10px;
+        }
+        #sendButton {
+            width: 80px;
+            padding: 10px;
+        }
+        .error {
+            color: red;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>WebSocket Chat</h1>
+    <div id="chat"></div>
+    <input type="text" id="messageInput" placeholder="Type your message here..." />
+    <button id="sendButton">Send</button>
+    <div id="errorMessage" class="error"></div>
+
+    <script>
+        const chat = document.getElementById("chat");
+        const messageInput = document.getElementById("messageInput");
+        const sendButton = document.getElementById("sendButton");
+        const errorMessage = document.getElementById("errorMessage");
+
+        const ws = new WebSocket("ws://localhost:8080/ws");
+
+        ws.onopen = () => {
+            appendMessage("Connected to the server.");
+        };
+
+        ws.onmessage = (event) => {
+            appendMessage(event.data);
+        };
+
+        ws.onclose = () => {
+            appendMessage("Disconnected from the server.");
+        };
+
+        ws.onerror = (error) => {
+            console.error("WebSocket error:", error);
+            appendMessage("WebSocket error occurred.");
+        };
+
+        sendButton.addEventListener("click", () => {
+            const message = messageInput.value.trim();
+            if (!message) {
+                showErrorMessage("Message cannot be empty.");
+                return;
+            }
+            ws.send(message);
+            messageInput.value = "";
+            clearErrorMessage();
+        });
+
+        function appendMessage(message) {
+            const div = document.createElement("div");
+            div.textContent = message;
+            chat.appendChild(div);
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        function showErrorMessage(msg) {
+            errorMessage.textContent = msg;
+        }
+
+        function clearErrorMessage() {
+            errorMessage.textContent = "";
+        }
+    </script>
+</body>
+</html>
