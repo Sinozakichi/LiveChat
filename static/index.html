@@ -44,10 +44,10 @@
         const sendButton = document.getElementById("sendButton");
         const errorMessage = document.getElementById("errorMessage");
 
-        const ws = new WebSocket("ws://localhost:8080/ws");
+        //const ws = new WebSocket("ws://localhost:8080/ws");
 
         // 將 WebSocket 連接 URL 修改為 Fly.io 提供的 URL
-//const ws = new WebSocket("wss://golivechattest.fly.dev/ws");  // 使用 wss (安全 WebSocket)
+const ws = new WebSocket("wss://golivechattest.fly.dev/ws");  // 使用 wss (安全 WebSocket)
 
 
         ws.onopen = () => {

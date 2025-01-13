@@ -19,6 +19,7 @@ var upgrader = websocket.Upgrader{
 
 // 處理 WebSocket 連接的函數
 func handleConnection(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Access-Control-Allow-Origin", "*") // 或限定域名
 	//將 HTTP 連接升級為 WebSocket 連接｛
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -52,6 +53,11 @@ func handleConnection(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+
+	// 設定靜態文件伺服器
+	fs := http.FileServer(http.Dir("./static"))
+	http.Handle("/", fs)
+
 	// 設定端口，根據環境變數來獲取
 	port := os.Getenv("PORT")
 	if port == "" {
