@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"os"
 
 	"github.com/gorilla/websocket"
 )
@@ -18,7 +19,7 @@ var upgrader = websocket.Upgrader{
 
 // 處理 WebSocket 連接的函數
 func handleConnection(w http.ResponseWriter, r *http.Request) {
-	//將 HTTP 連接升級為 WebSocket 連接
+	//將 HTTP 連接升級為 WebSocket 連接｛
 	conn, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		fmt.Println("Failed to upgrade:", err)
@@ -51,9 +52,16 @@ func handleConnection(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+	// 設定端口，根據環境變數來獲取
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080" // 如果沒設定，則使用 8080
+	}
+	fmt.Println("Server started at :" + port)
+
 	// 設定路由，當請求 URI 為 "/ws" 時，路由到 handleConnection 函數
 	http.HandleFunc("/ws", handleConnection)
-	// 啟動 HTTP 伺服器，監聽埠 8080
-	fmt.Println("Server started at :8080")
-	http.ListenAndServe(":8080", nil)
+
+	// 啟動 HTTP 伺服器，監聽指定端口
+	http.ListenAndServe(":"+port, nil)
 }
