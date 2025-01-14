@@ -69,5 +69,6 @@ func main() {
 	http.HandleFunc("/ws", handleConnection)
 
 	// 啟動 HTTP 伺服器，監聽指定端口
+	//初始化一個 server 物件，然後呼叫了net.Listen("tcp", addr)，也就是底層用 TCP 協議建立了一個服務，然後監聽我們設定的埠。
 	http.ListenAndServe(":"+port, nil)
 }
