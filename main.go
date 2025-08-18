@@ -2,73 +2,114 @@ package main
 
 import (
 	"fmt"
+	"livechat/backend/handler"
+	"livechat/backend/migrations"
+	"livechat/backend/repository"
+	"livechat/backend/service"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
 
-	"github.com/gorilla/websocket"
+	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
-// websocket.Upgrader 是 websocket 套件中用來處理將 HTTP 連接升級為 WebSocket 連接的過程
-var upgrader = websocket.Upgrader{
-	//websocket.Upgrader的欄位之一，用來檢查 WebSocket 連接的來源
-	CheckOrigin: func(r *http.Request) bool {
-		//表示接受所有來源的 WebSocket 連接
-		return true
-	},
-}
+func main() {
+	// 載入環境變數
+	if err := godotenv.Load(); err != nil {
+		fmt.Printf("Warning: .env file not found: %v\n", err)
+	}
 
-// 處理 WebSocket 連接的函數
-func handleConnection(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Access-Control-Allow-Origin", "*") // 或限定域名
-	//將 HTTP 連接升級為 WebSocket 連接｛
-	conn, err := upgrader.Upgrade(w, r, nil)
+	// 初始化數據庫
+	db, err := initDB()
 	if err != nil {
-		fmt.Println("Failed to upgrade:", err)
+		fmt.Printf("Database initialization error: %v\n", err)
 		return
 	}
-	defer conn.Close() // 在函數返回前關閉連接
 
-	// 為每個新連接創建一個唯一的 ID
-	clientID := fmt.Sprintf("%p", conn)
-	client := &Client{
-		ID:   clientID,
-		Conn: conn,
+	// 執行資料庫遷移
+	migrator := migrations.NewMigrator(db)
+	if err := migrator.MigrateUp(); err != nil {
+		fmt.Printf("Migration error: %v\n", err)
+		return
 	}
-	// 將新的連接加入到 clients 集合中
-	clients[clientID] = client
 
-	for {
-		// 讀取 WebSocket 訊息
-		_, msg, err := conn.ReadMessage()
-		if err != nil {
-			fmt.Println("Read error:", err)
-			delete(clients, clientID)
-			break
-		}
-		fmt.Printf("Received: %s\n", msg)
-		// 將接收到的訊息回傳給客戶端
-		broadcastMessage(msg)
-		//conn.WriteMessage(websocket.TextMessage, msg)
-	}
-}
+	// 創建儲存庫
+	clientRepo := repository.NewClientRepository()
+	roomRepo := repository.NewRoomRepository(db)
 
-func main() {
+	// 創建服務
+	broadcastService := service.NewBroadcastService(clientRepo)
+	roomService := service.NewRoomService(roomRepo)
 
-	// 設定靜態文件伺服器
-	fs := http.FileServer(http.Dir("./static"))
-	http.Handle("/", fs)
+	// 創建處理器
+	wsHandler := handler.NewWebSocketHandler(broadcastService, handler.WithLogger(&handler.DefaultLogger{}))
+	roomHandler := handler.NewRoomHandler(roomService)
 
-	// 設定端口，根據環境變數來獲取
+	// 創建 Gin 路由
+	router := gin.Default()
+
+	// 註冊聊天室相關路由
+	roomHandler.RegisterRoutes(router)
+
+	// WebSocket 路由
+	router.GET("/ws", func(c *gin.Context) {
+		wsHandler.HandleConnection(c.Writer, c.Request)
+	})
+
+	// 靜態文件服務 - 使用更具體的路徑，避免與 API 路由衝突
+	router.Static("/static", "./frontend/css")
+	router.Static("/js", "./frontend/js")
+	router.StaticFile("/", "./frontend/index.html")
+	router.StaticFile("/chat.html", "./frontend/chat.html")
+
+	// 啟動服務器
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8080" // 如果沒設定，則使用 8080
+		port = "8080"
 	}
+
 	fmt.Println("Server started at :" + port)
 
-	// 設定路由，當請求 URI 為 "/ws" 時，路由到 handleConnection 函數
-	http.HandleFunc("/ws", handleConnection)
+	server := &http.Server{
+		Addr:    ":" + port,
+		Handler: router,
+	}
 
-	// 啟動 HTTP 伺服器，監聽指定端口
-	//初始化一個 server 物件，然後呼叫了net.Listen("tcp", addr)，也就是底層用 TCP 協議建立了一個服務，然後監聽我們設定的埠。
-	http.ListenAndServe(":"+port, nil)
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			fmt.Printf("HTTP server error: %v\n", err)
+		}
+	}()
+
+	// 優雅關閉
+	stopChan := make(chan os.Signal, 1)
+	signal.Notify(stopChan, os.Interrupt, syscall.SIGTERM)
+	<-stopChan
+
+	fmt.Println("Shutting down server...")
+	fmt.Println("Server gracefully stopped")
+}
+
+// 初始化數據庫
+func initDB() (*gorm.DB, error) {
+	// 從環境變數獲取資料庫連線字串
+	dbURL := os.Getenv("DATABASE_URL")
+	if dbURL == "" {
+		// 如果環境變數未設置，使用預設連線字串
+		dbURL = "postgres://postgres:eoae368619220@db.ywhbgozuehgeadaqorsx.supabase.co:5432/postgres?sslmode=require"
+		fmt.Println("Warning: DATABASE_URL not set, using default connection string")
+	}
+
+	// 連接 PostgreSQL 資料庫
+	db, err := gorm.Open(postgres.Open(dbURL), &gorm.Config{})
+	if err != nil {
+		return nil, err
+	}
+
+	fmt.Println("Successfully connected to PostgreSQL database")
+	return db, nil
 }

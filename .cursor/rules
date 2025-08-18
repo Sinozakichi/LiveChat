@@ -1,0 +1,40 @@
+# 📘 專案架構與開發規範
+
+- Use RESTful principles to define all API endpoints. For example: GET /users/:id, POST /users
+  # 所有 API 請依據 RESTful 原則設計，使用標準 HTTP 動詞對應資源導向的 URL，例如：
+  # - GET /users/:id → 查詢單一使用者
+  # - POST /users → 新增使用者資料
+
+- Use Gin framework exclusively for all HTTP routing and middleware logic
+  # 僅使用 Gin 作為後端 HTTP 框架，處理所有路由與 middleware。禁止同時混用其他路由框架（如 Fiber）。
+
+- Apply a layered architecture with clear separation of concerns: handler, service, repository
+  # 專案需採用分層式架構，並區分以下層級：
+  # - handler：處理 HTTP 請求與回應
+  # - model：定義資料模型
+  # - service：處理商業邏輯與流程編排
+  # - repository：與資料庫互動，處理 CRUD
+
+- Do not arbitrarily add new files during development unless developing a new module, new feature, or explicitly authorized
+  # 除非是開發新模組、新功能，或經我特別准許，否則非必要情況下禁止新增檔案，特別是在測試與偵錯階段。
+
+- During debugging, test your changes on the modified files or functions and continue iterating until the problem is resolved
+  # 偵錯時，請專注於相關檔案或區段進行修改與測試，並持續調整至問題完全排除為止。
+
+- After every change, immediately run full local unit and integration tests and report the results
+  # 每次修改後請立即執行完整的本地單元測試與整合測試，並回報測試結果。
+
+# 資料庫連線資訊與規範
+請參考 `rulesdetail/rules_DB.md` 中的資料庫連線資訊與規範。
+
+# 開發方法實踐規範
+請參考 `rulesdetail/rules_developmentmethod.md` 中的開發方法實踐規範。
+
+# 程式設計原則與風格規範
+請參考 `rulesdetail/rules_programmingstyle.md` 中的程式設計原則與風格規範。
+
+# CI/CD 與自動化流程規範
+請參考 `rulesdetail/rules_CICD.md` 中的 CI/CD 與自動化流程規範。
+
+# Vibestory規範
+請參考 `rulesdetail/rules_vibestory.md` 中的 Vibestory規範。
