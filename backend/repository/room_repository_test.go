@@ -80,7 +80,7 @@ func TestGetAllRooms(t *testing.T) {
 	// 斷言 (Assert)
 	assert.NoError(t, err, "獲取所有聊天室不應該返回錯誤")
 	assert.Equal(t, 2, len(rooms), "應該有 2 個聊天室")
-	assert.Equal(t, uint(1), rooms[0].ID, "第一個聊天室的 ID 應該匹配")
+	assert.Equal(t, "1", rooms[0].ID, "第一個聊天室的 ID 應該匹配")
 	assert.Equal(t, "聊天室1", rooms[0].Name, "第一個聊天室的名稱應該匹配")
 	mockDB.AssertExpectations(t)
 }
@@ -155,7 +155,7 @@ func TestGetRoomUsers(t *testing.T) {
 	}
 
 	// 設置模擬行為
-	mockDB.On("Where", "room_id = ? AND is_active = ?", "1", true).Return(mockDB)
+	mockDB.On("Where", "room_id = ? AND is_active = ?", []interface{}{"1", true}).Return(mockDB)
 	mockDB.On("Find", mock.AnythingOfType("*[]model.RoomUser")).Run(func(args mock.Arguments) {
 		users := args.Get(0).(*[]model.RoomUser)
 		*users = expectedUsers
@@ -209,7 +209,7 @@ func TestLeaveRoom(t *testing.T) {
 	}
 
 	// 設置模擬行為
-	mockDB.On("Where", "room_id = ? AND user_id = ? AND is_active = ?", "1", "user-123", true).Return(mockDB)
+	mockDB.On("Where", "room_id = ? AND user_id = ? AND is_active = ?", []interface{}{"1", "user-123", true}).Return(mockDB)
 	mockDB.On("First", mock.AnythingOfType("*model.RoomUser")).Run(func(args mock.Arguments) {
 		user := args.Get(0).(*model.RoomUser)
 		*user = *expectedRoomUser
@@ -239,7 +239,7 @@ func TestGetRoomMessages(t *testing.T) {
 	}
 
 	// 設置模擬行為
-	mockDB.On("Where", "room_id = ?", "1").Return(mockDB)
+	mockDB.On("Where", "room_id = ?", []interface{}{"1"}).Return(mockDB)
 	mockDB.On("Order", "created_at desc").Return(mockDB)
 	mockDB.On("Limit", 50).Return(mockDB)
 	mockDB.On("Find", mock.AnythingOfType("*[]model.Message")).Run(func(args mock.Arguments) {
@@ -294,7 +294,7 @@ func TestCountActiveUsers(t *testing.T) {
 	mockResult.Err = nil
 
 	// 設置模擬行為
-	mockDB.On("Where", "room_id = ? AND is_active = ?", "1", true).Return(mockWhereResult)
+	mockDB.On("Where", "room_id = ? AND is_active = ?", []interface{}{"1", true}).Return(mockWhereResult)
 	mockDB.On("Count", mock.AnythingOfType("*int64")).Run(func(args mock.Arguments) {
 		count := args.Get(0).(*int64)
 		*count = 5

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"livechat/backend/handler"
+	"livechat/backend/middleware"
 	"livechat/backend/migrations"
 	"livechat/backend/repository"
 	"livechat/backend/service"
@@ -40,17 +41,29 @@ func main() {
 	// 創建儲存庫
 	clientRepo := repository.NewClientRepository()
 	roomRepo := repository.NewRoomRepository(db)
+	userRepo := repository.NewUserRepository(db)
 
 	// 創建服務
 	broadcastService := service.NewBroadcastService(clientRepo)
 	roomService := service.NewRoomService(roomRepo)
+	userService := service.NewUserService(userRepo)
 
 	// 創建處理器
 	wsHandler := handler.NewWebSocketHandler(broadcastService, handler.WithLogger(&handler.DefaultLogger{}))
 	roomHandler := handler.NewRoomHandler(roomService)
+	userHandler := handler.NewUserHandler(userService)
 
 	// 創建 Gin 路由
 	router := gin.Default()
+
+	// 加載 HTML 模板
+	router.LoadHTMLGlob("frontend/*.html")
+
+	// 設置會話中間件
+	router.Use(middleware.SessionMiddleware(userService))
+
+	// 註冊用戶相關路由
+	userHandler.RegisterRoutes(router)
 
 	// 註冊聊天室相關路由
 	roomHandler.RegisterRoutes(router)
@@ -63,8 +76,11 @@ func main() {
 	// 靜態文件服務 - 使用更具體的路徑，避免與 API 路由衝突
 	router.Static("/static", "./frontend/css")
 	router.Static("/js", "./frontend/js")
-	router.StaticFile("/", "./frontend/index.html")
-	router.StaticFile("/chat.html", "./frontend/chat.html")
+	router.StaticFile("/", "./frontend/index.html")           // 登入頁面設為首頁
+	router.StaticFile("/rooms.html", "./frontend/rooms.html") // 聊天室列表頁面
+	router.StaticFile("/chat.html", "./frontend/chat.html")   // 聊天頁面
+	router.StaticFile("/login.html", "./frontend/login.html") // 保留原登入頁面路由
+	router.StaticFile("/register.html", "./frontend/register.html")
 
 	// 啟動服務器
 	port := os.Getenv("PORT")

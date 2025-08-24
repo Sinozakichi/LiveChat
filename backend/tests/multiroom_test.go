@@ -14,9 +14,7 @@ var multiroomOpts = godog.Options{
 	Format: "pretty",
 }
 
-func init() {
-	godog.BindCommandLineFlags("godog.", &multiroomOpts)
-}
+// 注意：移除 godog.BindCommandLineFlags 以避免與其他測試的 flag 衝突
 
 func TestMultiRoomFeatures(t *testing.T) {
 	flag.Parse()

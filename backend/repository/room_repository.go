@@ -9,12 +9,6 @@ import (
 	"gorm.io/gorm"
 )
 
-// 定義錯誤
-var (
-	ErrRoomNotFound = errors.New("聊天室不存在")
-	ErrUserNotFound = errors.New("用戶不存在")
-)
-
 // RoomRepository 管理聊天室數據
 type RoomRepository struct {
 	db DB

@@ -159,11 +159,13 @@ func TestMessageLogSizeLimit(t *testing.T) {
 		msg := ChatMessage{
 			Type:      TextMessage,
 			Content:   "Test message",
+			RoomID:    "", // 明確設置為空，這會使用 "global" 鍵
 			Timestamp: time.Now().Unix(),
 		}
 		service.logMessage(msg)
 	}
 
 	// 斷言 (Assert)
-	assert.Equal(t, 3, len(service.messageLog), "訊息日誌大小應該被限制為 3")
+	globalMessages := service.GetMessageHistory("global")
+	assert.Equal(t, 3, len(globalMessages), "訊息日誌大小應該被限制為 3")
 }

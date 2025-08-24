@@ -99,9 +99,9 @@ func InitializeMultiRoomScenario(ctx *godog.ScenarioContext) {
 	// Given 步驟
 	ctx.Step(`^系統中有(\d+)個預設聊天室$`, testCtx.thereAreDefaultRooms)
 	ctx.Step(`^使用者正在查看聊天室列表$`, testCtx.userIsViewingRoomList)
-	ctx.Step(`^使用者A和使用者B都在"([^"]*)"$`, testCtx.usersAreInRoom)
-	ctx.Step(`^使用者C在"([^"]*)"$`, testCtx.userIsInRoom)
-	ctx.Step(`^使用者已經在"([^"]*)"$`, testCtx.userIsInRoom)
+	ctx.Step(`^使用者A和使用者B都在"([^"]*)"$`, testCtx.usersABInRoom)
+	ctx.Step(`^使用者C在"([^"]*)"$`, testCtx.userCInRoom)
+	ctx.Step(`^使用者已經在"([^"]*)"$`, testCtx.userInRoomGeneric)
 	ctx.Step(`^使用者A已經在"([^"]*)"$`, testCtx.userAIsInRoom)
 	ctx.Step(`^聊天室列表頁面$`, testCtx.roomListPage)
 	ctx.Step(`^(\d+)個使用者加入"([^"]*)"$`, testCtx.usersJoinRoom)
@@ -167,11 +167,21 @@ func (ctx *MultiRoomTestContext) thereAreDefaultRooms(count int) error {
 		ctx.rooms[roomName] = &rooms[i]
 	}
 
-	// 設置模擬行為
-	ctx.db.On("Find", mock.AnythingOfType("*[]model.Room"), mock.Anything).Run(func(args mock.Arguments) {
+	// 設置模擬行為 - 為GetAllRooms方法設置
+	ctx.db.On("Find", mock.AnythingOfType("*[]model.Room"), []interface{}{"is_active = ?", true}).Run(func(args mock.Arguments) {
 		roomsPtr := args.Get(0).(*[]model.Room)
 		*roomsPtr = rooms
 	}).Return(mockResult)
+
+	// 為CountActiveUsers方法設置Mock - 為每個房間設置0個活躍用戶
+	for i := 0; i < count; i++ {
+		roomID := fmt.Sprintf("test-room-%d", i+1)
+		ctx.db.On("Where", "room_id = ? AND is_active = ?", []interface{}{roomID, true}).Return(ctx.db)
+		ctx.db.On("Count", mock.AnythingOfType("*int64")).Run(func(args mock.Arguments) {
+			count := args.Get(0).(*int64)
+			*count = 0 // 模擬0個活躍用戶
+		}).Return(mockResult)
+	}
 
 	return nil
 }
@@ -220,6 +230,18 @@ func (ctx *MultiRoomTestContext) usersAreInRoom(users, roomName string) error {
 	time.Sleep(100 * time.Millisecond)
 
 	return nil
+}
+
+func (ctx *MultiRoomTestContext) usersABInRoom(roomName string) error {
+	return ctx.usersAreInRoom("A,B", roomName)
+}
+
+func (ctx *MultiRoomTestContext) userCInRoom(roomName string) error {
+	return ctx.userIsInRoom("UserC", roomName)
+}
+
+func (ctx *MultiRoomTestContext) userInRoomGeneric(roomName string) error {
+	return ctx.userIsInRoom("User", roomName)
 }
 
 func (ctx *MultiRoomTestContext) userIsInRoom(user, roomName string) error {

@@ -9,8 +9,8 @@ import (
 // Migration001InitialSchema 初始化資料庫結構
 type Migration001InitialSchema struct{}
 
-// Name 返回遷移名稱
-func (m Migration001InitialSchema) Name() string {
+// ID 返回遷移 ID
+func (m Migration001InitialSchema) ID() string {
 	return "001_initial_schema"
 }
 

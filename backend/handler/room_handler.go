@@ -79,7 +79,7 @@ func (h *RoomHandler) GetAllRooms(c *gin.Context) {
 
 	fmt.Printf("Found %d rooms in database\n", len(rooms))
 	for i, room := range rooms {
-		fmt.Printf("Room %d: ID=%d, Name=%s\n", i+1, room.ID, room.Name)
+		fmt.Printf("Room %d: ID=%s, Name=%s\n", i+1, room.ID, room.Name)
 	}
 
 	// 構建響應
