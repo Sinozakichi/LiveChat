@@ -20,7 +20,7 @@ func (m Migration001InitialSchema) Up(db *gorm.DB) error {
 
 	// 創建 rooms 表 (已由模型中的 TableName 方法指定表名)
 	// 禁用外鍵約束，避免遷移錯誤
-	if err := db.Exec("CREATE TABLE IF NOT EXISTS rooms (id SERIAL PRIMARY KEY, created_at TIMESTAMP, updated_at TIMESTAMP, deleted_at TIMESTAMP, name VARCHAR(255) NOT NULL, description TEXT, is_public BOOLEAN DEFAULT true, max_users INTEGER DEFAULT 100, created_by VARCHAR(255), is_active BOOLEAN DEFAULT true)").Error; err != nil {
+	if err := db.Exec("CREATE TABLE IF NOT EXISTS rooms (id UUID PRIMARY KEY, created_at TIMESTAMP, updated_at TIMESTAMP, deleted_at TIMESTAMP, name VARCHAR(255) NOT NULL, description TEXT, is_public BOOLEAN DEFAULT true, max_users INTEGER DEFAULT 100, created_by VARCHAR(255), is_active BOOLEAN DEFAULT true)").Error; err != nil {
 		return fmt.Errorf("failed to create rooms table: %w", err)
 	}
 

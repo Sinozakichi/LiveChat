@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"livechat/backend/model"
-	"strconv"
 	"time"
 
 	"gorm.io/gorm"
@@ -45,13 +44,8 @@ func NewRoomRepository(db DB) *RoomRepository {
 func (r *RoomRepository) GetRoom(roomID string) (*model.Room, error) {
 	var room model.Room
 
-	// 嘗試將 roomID 轉換為 uint
-	id, err := strconv.ParseUint(roomID, 10, 32)
-	if err != nil {
-		return nil, err
-	}
-
-	result := r.db.First(&room, uint(id))
+	// 直接使用字串 ID 查詢
+	result := r.db.First(&room, "id = ?", roomID)
 	if result.Error != nil {
 		if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 			return nil, ErrRoomNotFound

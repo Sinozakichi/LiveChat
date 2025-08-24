@@ -16,7 +16,6 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"gorm.io/gorm"
 )
 
 // 測試多聊天室功能的整合測試
@@ -79,8 +78,8 @@ func TestMultiRoomIntegration(t *testing.T) {
 		mockResult := new(repository.MockGormDB)
 		mockResult.Err = nil
 		rooms := []model.Room{
-			{Model: gorm.Model{ID: 1}, Name: "公共聊天室", Description: "這是一個公開的聊天室，所有人都可以加入"},
-			{Model: gorm.Model{ID: 2}, Name: "技術討論", Description: "討論各種技術話題，包括程式設計、網絡、數據庫等"},
+			{ID: "test-room-1", Name: "公共聊天室", Description: "這是一個公開的聊天室，所有人都可以加入", CreatedAt: time.Now(), UpdatedAt: time.Now()},
+			{ID: "test-room-2", Name: "技術討論", Description: "討論各種技術話題，包括程式設計、網絡、數據庫等", CreatedAt: time.Now(), UpdatedAt: time.Now()},
 		}
 		db.On("Find", mock.AnythingOfType("*[]model.Room"), mock.Anything).Run(func(args mock.Arguments) {
 			roomsPtr := args.Get(0).(*[]model.Room)
@@ -114,7 +113,9 @@ func TestMultiRoomIntegration(t *testing.T) {
 		mockResult := new(repository.MockGormDB)
 		mockResult.Err = nil
 		room := &model.Room{
-			Model:       gorm.Model{ID: 1},
+			ID:          "test-room-1",
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
 			Name:        "測試聊天室",
 			Description: "這是一個測試聊天室",
 			IsPublic:    true,

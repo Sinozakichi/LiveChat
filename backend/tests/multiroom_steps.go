@@ -17,7 +17,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/mock"
-	"gorm.io/gorm"
 )
 
 // MultiRoomTestContext 保存測試狀態
@@ -155,7 +154,9 @@ func (ctx *MultiRoomTestContext) thereAreDefaultRooms(count int) error {
 		roomDesc := defaultRoomDescs[i%len(defaultRoomDescs)]
 
 		rooms[i] = model.Room{
-			Model:       gorm.Model{ID: uint(i + 1)},
+			ID:          fmt.Sprintf("test-room-%d", i+1),
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
 			Name:        roomName,
 			Description: roomDesc,
 			IsPublic:    true,

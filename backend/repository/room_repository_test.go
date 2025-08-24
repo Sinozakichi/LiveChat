@@ -7,7 +7,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"gorm.io/gorm"
 )
 
 // 測試創建新的聊天室儲存庫
@@ -31,8 +30,10 @@ func TestGetRoom(t *testing.T) {
 	mockResult.Err = nil
 
 	expectedRoom := &model.Room{
-		Model: gorm.Model{ID: 1},
-		Name:  "測試聊天室",
+		ID:        "1",
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		Name:      "測試聊天室",
 	}
 
 	// 設置模擬行為
@@ -61,8 +62,8 @@ func TestGetAllRooms(t *testing.T) {
 	mockResult.Err = nil
 
 	expectedRooms := []model.Room{
-		{Model: gorm.Model{ID: 1}, Name: "聊天室1"},
-		{Model: gorm.Model{ID: 2}, Name: "聊天室2"},
+		{ID: "1", CreatedAt: time.Now(), UpdatedAt: time.Now(), Name: "聊天室1"},
+		{ID: "2", CreatedAt: time.Now(), UpdatedAt: time.Now(), Name: "聊天室2"},
 	}
 
 	// 設置模擬行為
@@ -121,7 +122,9 @@ func TestUpdateRoom(t *testing.T) {
 	mockResult.Err = nil
 
 	room := &model.Room{
-		Model:       gorm.Model{ID: 1},
+		ID:          "1",
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
 		Name:        "更新的聊天室",
 		Description: "這是一個更新的聊天室",
 	}
@@ -147,8 +150,8 @@ func TestGetRoomUsers(t *testing.T) {
 	mockResult.Err = nil
 
 	expectedUsers := []model.RoomUser{
-		{Model: gorm.Model{ID: 1}, RoomID: "1", UserID: "user-1", IsActive: true},
-		{Model: gorm.Model{ID: 2}, RoomID: "1", UserID: "user-2", IsActive: true},
+		{RoomID: "1", UserID: "user-1", IsActive: true},
+		{RoomID: "1", UserID: "user-2", IsActive: true},
 	}
 
 	// 設置模擬行為
@@ -200,7 +203,6 @@ func TestLeaveRoom(t *testing.T) {
 	mockSaveResult.Err = nil
 
 	expectedRoomUser := &model.RoomUser{
-		Model:    gorm.Model{ID: 1},
 		RoomID:   "1",
 		UserID:   "user-123",
 		IsActive: true,
@@ -231,10 +233,9 @@ func TestGetRoomMessages(t *testing.T) {
 	mockResult := new(MockGormDB)
 	mockResult.Err = nil
 
-	now := time.Now()
 	expectedMessages := []model.Message{
-		{Model: gorm.Model{ID: 1, CreatedAt: now}, RoomID: "1", UserID: "user-1", Content: "訊息1"},
-		{Model: gorm.Model{ID: 2, CreatedAt: now.Add(time.Minute)}, RoomID: "1", UserID: "user-2", Content: "訊息2"},
+		{RoomID: "1", UserID: "user-1", Content: "訊息1"},
+		{RoomID: "1", UserID: "user-2", Content: "訊息2"},
 	}
 
 	// 設置模擬行為

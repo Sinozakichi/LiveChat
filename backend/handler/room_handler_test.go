@@ -8,11 +8,11 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"gorm.io/gorm"
 )
 
 // MockRoomService 是一個模擬的聊天室服務
@@ -93,8 +93,8 @@ func TestGetAllRooms(t *testing.T) {
 
 	// 模擬數據
 	rooms := []model.Room{
-		{Model: gorm.Model{ID: 1}, Name: "聊天室1", Description: "描述1"},
-		{Model: gorm.Model{ID: 2}, Name: "聊天室2", Description: "描述2"},
+		{ID: "1", Name: "聊天室1", Description: "描述1", CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		{ID: "2", Name: "聊天室2", Description: "描述2", CreatedAt: time.Now(), UpdatedAt: time.Now()},
 	}
 
 	// 設置模擬行為
@@ -132,7 +132,9 @@ func TestGetRoom(t *testing.T) {
 
 	// 模擬數據
 	room := &model.Room{
-		Model:       gorm.Model{ID: 1},
+		ID:          "1",
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
 		Name:        "測試聊天室",
 		Description: "這是一個測試聊天室",
 		IsPublic:    true,
@@ -180,7 +182,9 @@ func TestCreateRoom(t *testing.T) {
 	}
 
 	room := &model.Room{
-		Model:       gorm.Model{ID: 1},
+		ID:          "1",
+		CreatedAt:   time.Now(),
+		UpdatedAt:   time.Now(),
 		Name:        "新聊天室",
 		Description: "這是一個新的聊天室",
 		IsPublic:    true,
@@ -221,8 +225,8 @@ func TestGetRoomMessages(t *testing.T) {
 
 	// 模擬數據
 	messages := []model.Message{
-		{Model: gorm.Model{ID: 1}, RoomID: "1", UserID: "user-1", Content: "訊息1"},
-		{Model: gorm.Model{ID: 2}, RoomID: "1", UserID: "user-2", Content: "訊息2"},
+		{RoomID: "1", UserID: "user-1", Content: "訊息1"},
+		{RoomID: "1", UserID: "user-2", Content: "訊息2"},
 	}
 
 	// 設置模擬行為
@@ -257,8 +261,8 @@ func TestGetRoomUsers(t *testing.T) {
 
 	// 模擬數據
 	users := []model.RoomUser{
-		{Model: gorm.Model{ID: 1}, RoomID: "1", UserID: "user-1", IsActive: true},
-		{Model: gorm.Model{ID: 2}, RoomID: "1", UserID: "user-2", IsActive: true},
+		{RoomID: "1", UserID: "user-1", IsActive: true},
+		{RoomID: "1", UserID: "user-2", IsActive: true},
 	}
 
 	// 設置模擬行為

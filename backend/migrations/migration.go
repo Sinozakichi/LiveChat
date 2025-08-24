@@ -16,7 +16,7 @@ type Migration interface {
 
 // MigrationRecord 代表資料庫中的遷移記錄
 type MigrationRecord struct {
-	ID        uint      `gorm:"primaryKey"`
+	ID        string    `gorm:"primaryKey;type:uuid"`
 	Name      string    `gorm:"size:255;not null;uniqueIndex"`
 	AppliedAt time.Time `gorm:"not null;default:CURRENT_TIMESTAMP"`
 }

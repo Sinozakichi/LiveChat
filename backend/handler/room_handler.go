@@ -31,7 +31,7 @@ type RoomHandler struct {
 
 // RoomResponse 是聊天室的 API 響應格式
 type RoomResponse struct {
-	ID          uint   `json:"id"`
+	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	IsPublic    bool   `json:"isPublic"`
@@ -86,7 +86,7 @@ func (h *RoomHandler) GetAllRooms(c *gin.Context) {
 	var response []RoomResponse
 	for _, room := range rooms {
 		// 獲取活躍用戶數
-		activeUsers, err := h.roomService.GetRoomActiveUserCount(strconv.Itoa(int(room.ID)))
+		activeUsers, err := h.roomService.GetRoomActiveUserCount(room.ID)
 		if err != nil {
 			activeUsers = 0
 		}

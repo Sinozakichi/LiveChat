@@ -8,13 +8,16 @@ import (
 
 // Room 代表一個聊天室
 type Room struct {
-	gorm.Model
-	Name        string `gorm:"size:255;not null"`
-	Description string `gorm:"type:text"`
-	IsPublic    bool   `gorm:"default:true"`
-	MaxUsers    int    `gorm:"default:100"`
-	CreatedBy   string `gorm:"size:255"`
-	IsActive    bool   `gorm:"default:true"`
+	ID          string `gorm:"primaryKey;type:uuid"`
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	DeletedAt   gorm.DeletedAt `gorm:"index"`
+	Name        string         `gorm:"size:255;not null"`
+	Description string         `gorm:"type:text"`
+	IsPublic    bool           `gorm:"default:true"`
+	MaxUsers    int            `gorm:"default:100"`
+	CreatedBy   string         `gorm:"size:255"`
+	IsActive    bool           `gorm:"default:true"`
 }
 
 // RoomUser 代表用戶與聊天室的關聯

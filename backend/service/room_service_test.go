@@ -8,7 +8,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
-	"gorm.io/gorm"
 )
 
 // MockRoomRepository 是一個模擬的聊天室儲存庫
@@ -92,8 +91,10 @@ func TestGetRoom(t *testing.T) {
 	// 安排 (Arrange)
 	mockRepo := new(MockRoomRepository)
 	expectedRoom := &model.Room{
-		Model: gorm.Model{ID: 1},
-		Name:  "測試聊天室",
+		ID:        "1",
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		Name:      "測試聊天室",
 	}
 
 	mockRepo.On("GetRoom", "1").Return(expectedRoom, nil)
@@ -114,8 +115,8 @@ func TestGetAllRooms(t *testing.T) {
 	// 安排 (Arrange)
 	mockRepo := new(MockRoomRepository)
 	expectedRooms := []model.Room{
-		{Model: gorm.Model{ID: 1}, Name: "聊天室1"},
-		{Model: gorm.Model{ID: 2}, Name: "聊天室2"},
+		{ID: "1", CreatedAt: time.Now(), UpdatedAt: time.Now(), Name: "聊天室1"},
+		{ID: "2", CreatedAt: time.Now(), UpdatedAt: time.Now(), Name: "聊天室2"},
 	}
 
 	mockRepo.On("GetAllRooms").Return(expectedRooms, nil)
@@ -165,8 +166,10 @@ func TestJoinRoom(t *testing.T) {
 	// 安排 (Arrange)
 	mockRepo := new(MockRoomRepository)
 	room := &model.Room{
-		Model: gorm.Model{ID: 1},
-		Name:  "測試聊天室",
+		ID:        "1",
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		Name:      "測試聊天室",
 	}
 
 	mockRepo.On("GetRoom", "1").Return(room, nil)
@@ -210,10 +213,9 @@ func TestLeaveRoom(t *testing.T) {
 func TestGetRoomMessages(t *testing.T) {
 	// 安排 (Arrange)
 	mockRepo := new(MockRoomRepository)
-	now := time.Now()
 	expectedMessages := []model.Message{
-		{Model: gorm.Model{ID: 1, CreatedAt: now}, RoomID: "1", UserID: "user-1", Content: "訊息1"},
-		{Model: gorm.Model{ID: 2, CreatedAt: now.Add(time.Minute)}, RoomID: "1", UserID: "user-2", Content: "訊息2"},
+		{RoomID: "1", UserID: "user-1", Content: "訊息1"},
+		{RoomID: "1", UserID: "user-2", Content: "訊息2"},
 	}
 
 	mockRepo.On("GetRoomMessages", "1", 50).Return(expectedMessages, nil)
@@ -234,8 +236,10 @@ func TestSendMessage(t *testing.T) {
 	// 安排 (Arrange)
 	mockRepo := new(MockRoomRepository)
 	room := &model.Room{
-		Model: gorm.Model{ID: 1},
-		Name:  "測試聊天室",
+		ID:        "1",
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		Name:      "測試聊天室",
 	}
 
 	mockRepo.On("GetRoom", "1").Return(room, nil)
@@ -264,8 +268,10 @@ func TestSendSystemMessage(t *testing.T) {
 	// 安排 (Arrange)
 	mockRepo := new(MockRoomRepository)
 	room := &model.Room{
-		Model: gorm.Model{ID: 1},
-		Name:  "測試聊天室",
+		ID:        "1",
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		Name:      "測試聊天室",
 	}
 
 	mockRepo.On("GetRoom", "1").Return(room, nil)
@@ -304,8 +310,8 @@ func TestGetRoomUsers(t *testing.T) {
 	// 安排 (Arrange)
 	mockRepo := new(MockRoomRepository)
 	expectedUsers := []model.RoomUser{
-		{Model: gorm.Model{ID: 1}, RoomID: "1", UserID: "user-1", IsActive: true},
-		{Model: gorm.Model{ID: 2}, RoomID: "1", UserID: "user-2", IsActive: true},
+		{RoomID: "1", UserID: "user-1", IsActive: true},
+		{RoomID: "1", UserID: "user-2", IsActive: true},
 	}
 
 	mockRepo.On("GetRoomUsers", "1").Return(expectedUsers, nil)
