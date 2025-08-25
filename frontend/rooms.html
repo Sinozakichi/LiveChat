@@ -13,7 +13,13 @@
     <div class="container py-5">
         <div class="card shadow-sm">
             <div class="card-header bg-primary text-white text-center py-3">
-                <h1 class="h3 mb-0">多人聊天室</h1>
+                <div class="d-flex justify-content-between align-items-center">
+                    <div></div> <!-- 左側空白 -->
+                    <h1 class="h3 mb-0">多人聊天室</h1>
+                    <div class="text-end">
+                        <small id="currentUser">載入中...</small>
+                    </div>
+                </div>
             </div>
             <div class="card-body">
                 <p class="text-center text-muted mb-4">請選擇一個聊天室加入，或創建新的聊天室</p>
@@ -29,7 +35,7 @@
                 
                 <hr>
                 
-                <div class="mt-4">
+                <div class="mt-4" id="createRoomSection" style="display: none;">
                     <h2 class="h4 mb-3">創建新聊天室</h2>
                     <form id="createRoomForm">
                         <div class="mb-3">

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"livechat/backend/middleware"
 	"livechat/backend/service"
 	"net/http"
 
@@ -26,13 +27,8 @@ type LoginRequest struct {
 	Password string `json:"password" binding:"required"`
 }
 
-// UserResponse 是用戶的 API 響應格式
-type UserResponse struct {
-	ID       string `json:"id"`
-	Username string `json:"username"`
-	Email    string `json:"email"`
-	Role     string `json:"role"`
-}
+// UserResponse 使用middleware包中的定義
+type UserResponse = middleware.UserResponse
 
 // NewUserHandler 創建一個新的用戶處理器
 func NewUserHandler(userService service.UserService) *UserHandler {
@@ -90,11 +86,12 @@ func (h *UserHandler) Register(c *gin.Context) {
 
 	// 創建會話
 	sessionID := uuid.New().String()
+	middleware.SetSession(sessionID, user)
 	c.SetCookie("session_id", sessionID, 0, "/", "", false, true) // 無過期時間
 	c.Set("user", user)
 
 	// 返回用戶信息
-	c.JSON(http.StatusCreated, UserResponse{
+	c.JSON(http.StatusCreated, middleware.UserResponse{
 		ID:       user.ID,
 		Username: user.Username,
 		Email:    user.Email,
@@ -119,11 +116,12 @@ func (h *UserHandler) Login(c *gin.Context) {
 
 	// 創建會話
 	sessionID := uuid.New().String()
+	middleware.SetSession(sessionID, user)
 	c.SetCookie("session_id", sessionID, 0, "/", "", false, true) // 無過期時間
 	c.Set("user", user)
 
 	// 返回用戶信息
-	c.JSON(http.StatusOK, UserResponse{
+	c.JSON(http.StatusOK, middleware.UserResponse{
 		ID:       user.ID,
 		Username: user.Username,
 		Email:    user.Email,
@@ -133,7 +131,13 @@ func (h *UserHandler) Login(c *gin.Context) {
 
 // Logout 處理用戶登出請求
 func (h *UserHandler) Logout(c *gin.Context) {
-	// 刪除會話
+	// 從cookie中獲取sessionID並清除session
+	sessionID, err := c.Cookie("session_id")
+	if err == nil {
+		middleware.RemoveSession(sessionID)
+	}
+
+	// 刪除會話cookie
 	c.SetCookie("session_id", "", -1, "/", "", false, true)
 	c.JSON(http.StatusOK, gin.H{"message": "登出成功"})
 }
@@ -147,7 +151,7 @@ func (h *UserHandler) GetCurrentUser(c *gin.Context) {
 		return
 	}
 
-	user, ok := userValue.(*UserResponse)
+	user, ok := userValue.(*middleware.UserResponse)
 	if !ok {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "用戶數據格式錯誤"})
 		return

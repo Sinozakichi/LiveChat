@@ -75,6 +75,7 @@ func main() {
 
 	// 靜態文件服務 - 使用更具體的路徑，避免與 API 路由衝突
 	router.Static("/static", "./frontend/css")
+	router.Static("/css", "./frontend/css") // 添加CSS路由映射
 	router.Static("/js", "./frontend/js")
 	router.StaticFile("/", "./frontend/index.html")           // 登入頁面設為首頁
 	router.StaticFile("/rooms.html", "./frontend/rooms.html") // 聊天室列表頁面

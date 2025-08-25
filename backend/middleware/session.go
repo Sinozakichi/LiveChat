@@ -16,11 +16,11 @@ type UserResponse struct {
 	Role     string `json:"role"`
 }
 
+// 全局session存儲 - 在實際應用中應該使用Redis或數據庫
+var sessionStore = make(map[string]*model.User)
+
 // SessionMiddleware 創建一個會話中間件
 func SessionMiddleware(userService service.UserService) gin.HandlerFunc {
-	// 在實際應用中，這裡應該使用 Redis 或其他存儲來保存會話
-	sessions := make(map[string]*model.User)
-
 	return func(c *gin.Context) {
 		// 從 cookie 中獲取會話 ID
 		sessionID, err := c.Cookie("session_id")
@@ -30,7 +30,7 @@ func SessionMiddleware(userService service.UserService) gin.HandlerFunc {
 		}
 
 		// 從會話存儲中獲取用戶
-		user, exists := sessions[sessionID]
+		user, exists := sessionStore[sessionID]
 		if !exists {
 			c.Next()
 			return
@@ -46,6 +46,16 @@ func SessionMiddleware(userService service.UserService) gin.HandlerFunc {
 
 		c.Next()
 	}
+}
+
+// SetSession 設置用戶session
+func SetSession(sessionID string, user *model.User) {
+	sessionStore[sessionID] = user
+}
+
+// RemoveSession 移除用戶session
+func RemoveSession(sessionID string) {
+	delete(sessionStore, sessionID)
 }
 
 // AuthRequired 創建一個需要認證的中間件

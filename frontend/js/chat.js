@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 如果沒有聊天室 ID 或用戶名，則返回列表頁面
     if (!roomId || !username) {
-        window.location.href = 'index.html';
+        window.location.href = 'rooms.html';
         return;
     }
     
@@ -28,6 +28,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // 載入聊天室信息
     loadRoomInfo();
     
+    // 顯示當前用戶信息
+    displayCurrentUser();
+    
     // 連接 WebSocket
     connectWebSocket();
     
@@ -42,8 +45,17 @@ document.addEventListener('DOMContentLoaded', function() {
     // 設置離開聊天室事件
     leaveRoomButton.addEventListener('click', function() {
         leaveRoom();
-        window.location.href = 'index.html';
+        window.location.href = 'rooms.html';
     });
+    
+    // 顯示當前用戶信息
+    function displayCurrentUser() {
+        const currentUserElement = document.getElementById('currentUser');
+        if (!currentUserElement) return;
+        
+        // 直接使用URL參數中的用戶名
+        currentUserElement.textContent = `用戶：${username}`;
+    }
     
     // 載入聊天室信息
     function loadRoomInfo() {
@@ -57,21 +69,22 @@ document.addEventListener('DOMContentLoaded', function() {
             .then(room => {
                 roomTitle.textContent = room.name;
                 roomDescription.textContent = room.description || '無描述';
-                updateOnlineCount(room.activeUsers);
+                // updateOnlineCount(room.activeUsers); // 在線人數統計功能暫時註解掉
             })
             .catch(error => {
                 console.error('Error:', error);
                 addSystemMessage(`載入聊天室信息失敗: ${error.message}`);
             });
         
-        // 載入聊天室用戶
-        loadRoomUsers();
+        // 載入聊天室用戶功能暫時註解掉
+        // loadRoomUsers();
         
         // 載入聊天室訊息
         loadRoomMessages();
     }
     
-    // 載入聊天室用戶
+    // 載入聊天室用戶功能暫時註解掉
+    /*
     function loadRoomUsers() {
         fetch(`/api/rooms/${roomId}/users`)
             .then(response => {
@@ -87,6 +100,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.error('Error:', error);
             });
     }
+    */
     
     // 載入聊天室訊息
     function loadRoomMessages() {
@@ -250,12 +264,15 @@ document.addEventListener('DOMContentLoaded', function() {
         chatMessages.appendChild(messageElement);
     }
     
-    // 更新在線用戶數
+    // 更新在線用戶數功能暫時註解掉
+    /*
     function updateOnlineCount(count) {
         onlineCount.innerHTML = `<i class="bi bi-people-fill"></i> ${count} 人在線`;
     }
+    */
     
-    // 更新用戶列表
+    // 更新用戶列表功能暫時註解掉
+    /*
     function updateUsersList(users) {
         usersList.innerHTML = '';
         
@@ -291,6 +308,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+    */
     
     // 滾動到底部
     function scrollToBottom() {
