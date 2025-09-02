@@ -137,11 +137,10 @@ func (s *BroadcastService) BroadcastMessage(message []byte) error {
 
 	// 廣播訊息
 	for _, client := range clients {
-		err := client.Conn.WriteMessage(websocket.TextMessage, message)
+		// 使用線程安全的寫入方法
+		err := client.SafeWriteMessage(websocket.TextMessage, message)
 		if err != nil {
 			s.handleClientError(client, err)
-		} else {
-			client.UpdateActivity()
 		}
 	}
 
@@ -177,11 +176,10 @@ func (s *BroadcastService) BroadcastToRoom(roomID string, message []byte) error 
 	for _, client := range clients {
 		if client.RoomID == roomID {
 			roomClients++
-			err := client.Conn.WriteMessage(websocket.TextMessage, message)
+			// 使用線程安全的寫入方法
+			err := client.SafeWriteMessage(websocket.TextMessage, message)
 			if err != nil {
 				s.handleClientError(client, err)
-			} else {
-				client.UpdateActivity()
 			}
 		}
 	}
@@ -208,13 +206,13 @@ func (s *BroadcastService) SendPrivateMessage(targetID string, message []byte) e
 		return errors.New("客戶端不活躍")
 	}
 
-	err = client.Conn.WriteMessage(websocket.TextMessage, message)
+	// 使用線程安全的寫入方法
+	err = client.SafeWriteMessage(websocket.TextMessage, message)
 	if err != nil {
 		s.handleClientError(client, err)
 		return err
 	}
 
-	client.UpdateActivity()
 	return nil
 }
 

@@ -16,10 +16,15 @@ import (
 	"github.com/cucumber/godog"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"github.com/stretchr/testify/mock"
 )
 
 // MultiRoomTestContext 保存測試狀態
+//
+// BDD 測試上下文設計：
+// 1. 維護跨場景的資料庫連線和狀態
+// 2. 提供聊天室名稱到實體的映射
+// 3. 管理 WebSocket 連線的生命週期
+// 4. 記錄 HTTP 請求和回應以供驗證
 type MultiRoomTestContext struct {
 	server           *httptest.Server
 	router           *gin.Engine
@@ -33,26 +38,50 @@ type MultiRoomTestContext struct {
 	connections      map[string]*websocket.Conn
 	responses        map[string]*httptest.ResponseRecorder
 	requestBodies    map[string]string
-	rooms            map[string]*model.Room
+	rooms            map[string]*model.Room // 聊天室名稱 -> 聊天室實體的映射
+	roomsById        map[string]*model.Room // 聊天室ID -> 聊天室實體的映射
 }
+
+// 全域測試上下文，用於跨場景保持狀態
+var globalTestContext *MultiRoomTestContext
 
 // InitializeMultiRoomScenario 初始化多聊天室功能的 BDD 測試
 func InitializeMultiRoomScenario(ctx *godog.ScenarioContext) {
 	// 設置 Gin 測試模式
 	gin.SetMode(gin.TestMode)
 
-	// 創建測試上下文
-	testCtx := &MultiRoomTestContext{
-		connections:   make(map[string]*websocket.Conn),
-		responses:     make(map[string]*httptest.ResponseRecorder),
-		requestBodies: make(map[string]string),
-		rooms:         make(map[string]*model.Room),
-	}
-
 	// 在每個場景開始前設置測試環境
 	ctx.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {
-		// 創建一個模擬的 GORM DB
-		testCtx.db = repository.NewMockDB()
+		// 如果是第一次初始化或者全域上下文不存在，創建新的測試上下文
+		if globalTestContext == nil {
+			globalTestContext = &MultiRoomTestContext{
+				connections:   make(map[string]*websocket.Conn),
+				responses:     make(map[string]*httptest.ResponseRecorder),
+				requestBodies: make(map[string]string),
+				rooms:         make(map[string]*model.Room),
+				roomsById:     make(map[string]*model.Room),
+			}
+
+			// 創建一個包含完整結構的模擬 GORM DB（只創建一次）
+			globalTestContext.db = repository.NewMockDBWithSchema()
+		} else {
+			// 清理連線和回應，但保留資料庫和聊天室資料
+			for _, conn := range globalTestContext.connections {
+				if conn != nil {
+					conn.Close()
+				}
+			}
+			globalTestContext.connections = make(map[string]*websocket.Conn)
+			globalTestContext.responses = make(map[string]*httptest.ResponseRecorder)
+
+			// 關閉舊的 HTTP 伺服器
+			if globalTestContext.server != nil {
+				globalTestContext.server.Close()
+			}
+		}
+
+		// 每次都重新創建服務和處理器（但使用相同的資料庫）
+		testCtx := globalTestContext
 
 		// 創建儲存庫
 		testCtx.roomRepo = repository.NewRoomRepository(testCtx.db)
@@ -79,84 +108,129 @@ func InitializeMultiRoomScenario(ctx *godog.ScenarioContext) {
 		return context.WithValue(ctx, "testContext", testCtx), nil
 	})
 
-	// 在每個場景結束後清理測試環境
+	// 在每個場景結束後清理測試環境（但不清理全域狀態）
 	ctx.After(func(ctx context.Context, sc *godog.Scenario, err error) (context.Context, error) {
-		testCtx := ctx.Value("testContext").(*MultiRoomTestContext)
-
-		// 關閉所有 WebSocket 連接
-		for _, conn := range testCtx.connections {
-			conn.Close()
-		}
-
-		// 關閉 HTTP 測試服務器
-		if testCtx.server != nil {
-			testCtx.server.Close()
+		// 注意：這裡不清理 globalTestContext，讓資料庫狀態跨場景保持
+		// 只清理當前場景的連線
+		if globalTestContext != nil {
+			for _, conn := range globalTestContext.connections {
+				if conn != nil {
+					conn.Close()
+				}
+			}
+			// 清空連線映射，但保留其他狀態
+			globalTestContext.connections = make(map[string]*websocket.Conn)
 		}
 
 		return ctx, nil
 	})
 
-	// Given 步驟
-	ctx.Step(`^系統中有(\d+)個預設聊天室$`, testCtx.thereAreDefaultRooms)
-	ctx.Step(`^使用者正在查看聊天室列表$`, testCtx.userIsViewingRoomList)
-	ctx.Step(`^使用者A和使用者B都在"([^"]*)"$`, testCtx.usersABInRoom)
-	ctx.Step(`^使用者C在"([^"]*)"$`, testCtx.userCInRoom)
-	ctx.Step(`^使用者已經在"([^"]*)"$`, testCtx.userInRoomGeneric)
-	ctx.Step(`^使用者A已經在"([^"]*)"$`, testCtx.userAIsInRoom)
-	ctx.Step(`^聊天室列表頁面$`, testCtx.roomListPage)
-	ctx.Step(`^(\d+)個使用者加入"([^"]*)"$`, testCtx.usersJoinRoom)
+	// Given 步驟 - 使用包裝函數來存取全域上下文
+	ctx.Step(`^系統中有(\d+)個預設聊天室$`, func(count int) error {
+		return globalTestContext.thereAreDefaultRooms(count)
+	})
+	ctx.Step(`^使用者正在查看聊天室列表$`, func() error {
+		return globalTestContext.userIsViewingRoomList()
+	})
+	ctx.Step(`^使用者A和使用者B都在"([^"]*)"$`, func(roomName string) error {
+		return globalTestContext.usersABInRoom(roomName)
+	})
+	ctx.Step(`^使用者C在"([^"]*)"$`, func(roomName string) error {
+		return globalTestContext.userCInRoom(roomName)
+	})
+	ctx.Step(`^使用者已經在"([^"]*)"$`, func(roomName string) error {
+		return globalTestContext.userInRoomGeneric(roomName)
+	})
+	ctx.Step(`^使用者A已經在"([^"]*)"$`, func(roomName string) error {
+		return globalTestContext.userAIsInRoom(roomName)
+	})
+	ctx.Step(`^聊天室列表頁面$`, func() error {
+		return globalTestContext.roomListPage()
+	})
+	ctx.Step(`^(\d+)個使用者加入"([^"]*)"$`, func(count int, roomName string) error {
+		return globalTestContext.usersJoinRoom(count, roomName)
+	})
 
 	// When 步驟
-	ctx.Step(`^使用者訪問聊天室列表頁面$`, testCtx.userVisitsRoomListPage)
-	ctx.Step(`^使用者點擊"([^"]*)"$`, testCtx.userClicksRoom)
-	ctx.Step(`^使用者A在"([^"]*)"發送訊息"([^"]*)"$`, testCtx.userSendsMessageInRoom)
-	ctx.Step(`^使用者點擊返回按鈕$`, testCtx.userClicksBackButton)
-	ctx.Step(`^使用者從列表中選擇"([^"]*)"$`, testCtx.userSelectsRoomFromList)
-	ctx.Step(`^使用者B加入"([^"]*)"$`, testCtx.userBJoinsRoom)
-	ctx.Step(`^使用者B離開"([^"]*)"$`, testCtx.userBLeavesRoom)
+	ctx.Step(`^使用者訪問聊天室列表頁面$`, func() error {
+		return globalTestContext.userVisitsRoomListPage()
+	})
+	ctx.Step(`^使用者點擊"([^"]*)"$`, func(roomName string) error {
+		return globalTestContext.userClicksRoom(roomName)
+	})
+	ctx.Step(`^使用者A在"([^"]*)"發送訊息"([^"]*)"$`, func(roomName, message string) error {
+		return globalTestContext.userSendsMessageInRoom("UserA", roomName, message)
+	})
+	ctx.Step(`^使用者點擊返回按鈕$`, func() error {
+		return globalTestContext.userClicksBackButton()
+	})
+	ctx.Step(`^使用者從列表中選擇"([^"]*)"$`, func(roomName string) error {
+		return globalTestContext.userSelectsRoomFromList(roomName)
+	})
+	ctx.Step(`^使用者B加入"([^"]*)"$`, func(roomName string) error {
+		return globalTestContext.userBJoinsRoom(roomName)
+	})
+	ctx.Step(`^使用者B離開"([^"]*)"$`, func(roomName string) error {
+		return globalTestContext.userBLeavesRoom(roomName)
+	})
 
 	// Then 步驟
-	ctx.Step(`^使用者應該看到(\d+)個聊天室的列表$`, testCtx.userShouldSeeRoomList)
-	ctx.Step(`^每個聊天室應顯示名稱和簡短描述$`, testCtx.eachRoomShouldShowNameAndDescription)
-	ctx.Step(`^使用者應該被導向到"([^"]*)"的聊天界面$`, testCtx.userShouldBeRedirectedToChatInterface)
-	ctx.Step(`^使用者應該看到"([^"]*)"的歡迎訊息$`, testCtx.userShouldSeeWelcomeMessage)
-	ctx.Step(`^使用者B應該在"([^"]*)"看到訊息"([^"]*)"$`, testCtx.userShouldSeeMessageInRoom)
-	ctx.Step(`^使用者C不應該在"([^"]*)"看到該訊息$`, testCtx.userShouldNotSeeMessageInRoom)
-	ctx.Step(`^使用者應該進入"([^"]*)"$`, testCtx.userShouldEnterRoom)
-	ctx.Step(`^使用者應該看到"([^"]*)"的歷史訊息$`, testCtx.userShouldSeeRoomHistory)
-	ctx.Step(`^使用者不應該再收到"([^"]*)"的新訊息$`, testCtx.userShouldNotReceiveNewMessages)
-	ctx.Step(`^使用者A應該看到系統通知"([^"]*)"$`, testCtx.userShouldSeeSystemNotification)
-	ctx.Step(`^"([^"]*)"應顯示"([^"]*)"$`, testCtx.roomShouldShowUserCount)
+	ctx.Step(`^使用者應該看到(\d+)個聊天室的列表$`, func(count int) error {
+		return globalTestContext.userShouldSeeRoomList(count)
+	})
+	ctx.Step(`^每個聊天室應顯示名稱和簡短描述$`, func() error {
+		return globalTestContext.eachRoomShouldShowNameAndDescription()
+	})
+	ctx.Step(`^使用者應該被導向到"([^"]*)"的聊天界面$`, func(roomName string) error {
+		return globalTestContext.userShouldBeRedirectedToChatInterface(roomName)
+	})
+	ctx.Step(`^使用者應該看到"([^"]*)"的歡迎訊息$`, func(roomName string) error {
+		return globalTestContext.userShouldSeeWelcomeMessage(roomName)
+	})
+	ctx.Step(`^使用者B應該在"([^"]*)"看到訊息"([^"]*)"$`, func(roomName, message string) error {
+		return globalTestContext.userShouldSeeMessageInRoom("UserB", roomName, message)
+	})
+	ctx.Step(`^使用者C不應該在"([^"]*)"看到該訊息$`, func(roomName string) error {
+		return globalTestContext.userShouldNotSeeMessageInRoom("UserC", roomName)
+	})
+	ctx.Step(`^使用者應該進入"([^"]*)"$`, func(roomName string) error {
+		return globalTestContext.userShouldEnterRoom(roomName)
+	})
+	ctx.Step(`^使用者應該看到"([^"]*)"的歷史訊息$`, func(roomName string) error {
+		return globalTestContext.userShouldSeeRoomHistory(roomName)
+	})
+	ctx.Step(`^使用者不應該再收到"([^"]*)"的新訊息$`, func(roomName string) error {
+		return globalTestContext.userShouldNotReceiveNewMessages(roomName)
+	})
+	ctx.Step(`^使用者A應該看到系統通知"([^"]*)"$`, func(notification string) error {
+		return globalTestContext.userShouldSeeSystemNotification(notification)
+	})
+	ctx.Step(`^"([^"]*)"應顯示"([^"]*)"$`, func(roomName, userCount string) error {
+		return globalTestContext.roomShouldShowUserCount(roomName, userCount)
+	})
 }
 
 // Given 步驟實現
+//
+// thereAreDefaultRooms BDD 步驟：「系統中有 N 個預設聊天室」
+//
+// 職責：
+// 1. 在真實的記憶體資料庫中創建指定數量的測試聊天室
+// 2. 設定聊天室的名稱、描述和其他屬性
+// 3. 將聊天室記錄到測試上下文中以供後續使用
+// 4. 確保每個聊天室都是活躍狀態
 func (ctx *MultiRoomTestContext) thereAreDefaultRooms(count int) error {
-	// 模擬 DB 行為
-	mockResult := new(repository.MockGormDB)
-	mockResult.Err = nil
+	// 為了與 BDD 特徵檔案中的聊天室名稱保持一致，
+	// 我們創建名為 "聊天室1", "聊天室2" 等的聊天室
 
-	// 創建指定數量的聊天室
-	rooms := make([]model.Room, count)
-
-	// 定義預設聊天室名稱和描述
-	defaultRoomNames := []string{"公共聊天室", "技術討論", "休閒娛樂", "學習交流", "新手指南"}
-	defaultRoomDescs := []string{
-		"這是一個公開的聊天室，所有人都可以加入",
-		"討論各種技術話題，包括程式設計、網絡、數據庫等",
-		"分享生活趣事、電影、音樂、遊戲等娛樂話題",
-		"交流學習心得、分享學習資源和方法",
-		"為新手提供幫助和指導的聊天室",
-	}
-
-	// 創建聊天室
+	// 創建並插入指定數量的聊天室到真實資料庫
 	for i := 0; i < count; i++ {
-		roomName := defaultRoomNames[i%len(defaultRoomNames)]
-		roomDesc := defaultRoomDescs[i%len(defaultRoomDescs)]
+		roomName := fmt.Sprintf("聊天室%d", i+1)
+		roomDesc := fmt.Sprintf("這是第 %d 個測試聊天室", i+1)
+		roomID := fmt.Sprintf("test-room-%d", i+1)
 
-		rooms[i] = model.Room{
-			ID:          fmt.Sprintf("test-room-%d", i+1),
-			CreatedAt:   time.Now(),
-			UpdatedAt:   time.Now(),
+		room := model.Room{
+			ID:          roomID,
 			Name:        roomName,
 			Description: roomDesc,
 			IsPublic:    true,
@@ -164,23 +238,16 @@ func (ctx *MultiRoomTestContext) thereAreDefaultRooms(count int) error {
 			CreatedBy:   "system",
 			IsActive:    true,
 		}
-		ctx.rooms[roomName] = &rooms[i]
-	}
 
-	// 設置模擬行為 - 為GetAllRooms方法設置
-	ctx.db.On("Find", mock.AnythingOfType("*[]model.Room"), []interface{}{"is_active = ?", true}).Run(func(args mock.Arguments) {
-		roomsPtr := args.Get(0).(*[]model.Room)
-		*roomsPtr = rooms
-	}).Return(mockResult)
+		// 直接插入到真實的記憶體資料庫中
+		err := ctx.db.DB.Create(&room).Error
+		if err != nil {
+			return fmt.Errorf("創建聊天室失敗: %v", err)
+		}
 
-	// 為CountActiveUsers方法設置Mock - 為每個房間設置0個活躍用戶
-	for i := 0; i < count; i++ {
-		roomID := fmt.Sprintf("test-room-%d", i+1)
-		ctx.db.On("Where", "room_id = ? AND is_active = ?", []interface{}{roomID, true}).Return(ctx.db)
-		ctx.db.On("Count", mock.AnythingOfType("*int64")).Run(func(args mock.Arguments) {
-			count := args.Get(0).(*int64)
-			*count = 0 // 模擬0個活躍用戶
-		}).Return(mockResult)
+		// 記錄到測試上下文中（同時記錄名稱和 ID 的映射）
+		ctx.rooms[roomName] = &room
+		ctx.roomsById[roomID] = &room
 	}
 
 	return nil

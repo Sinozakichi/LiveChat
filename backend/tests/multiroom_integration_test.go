@@ -15,7 +15,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 )
 
 // 測試多聊天室功能的整合測試
@@ -23,8 +22,8 @@ func TestMultiRoomIntegration(t *testing.T) {
 	// 設置 Gin 測試模式
 	gin.SetMode(gin.TestMode)
 
-	// 創建一個模擬的 GORM DB
-	db := repository.NewMockDB()
+	// 創建一個包含完整資料庫結構的模擬 GORM DB
+	db := repository.NewMockDBWithSchema()
 
 	// 創建儲存庫
 	roomRepo := repository.NewRoomRepository(db)
@@ -52,10 +51,7 @@ func TestMultiRoomIntegration(t *testing.T) {
 		req, _ := http.NewRequest("POST", "/api/rooms", strings.NewReader(reqBody))
 		req.Header.Set("Content-Type", "application/json")
 
-		// 模擬 DB 行為
-		mockResult := new(repository.MockGormDB)
-		mockResult.Err = nil
-		db.On("Create", mock.AnythingOfType("*model.Room")).Return(mockResult)
+		// 使用真實的資料庫操作（NewMockDBWithSchema 提供真實 SQLite 實例）
 
 		// 執行請求
 		w := httptest.NewRecorder()
@@ -71,25 +67,20 @@ func TestMultiRoomIntegration(t *testing.T) {
 
 	// 測試獲取聊天室列表
 	t.Run("Get_Room_List", func(t *testing.T) {
+		// 先創建測試資料
+		testRooms := []model.Room{
+			{ID: "test-room-1", Name: "公共聊天室", Description: "這是一個公開的聊天室，所有人都可以加入", IsPublic: true, MaxUsers: 100, CreatedBy: "system", IsActive: true},
+			{ID: "test-room-2", Name: "技術討論", Description: "討論各種技術話題，包括程式設計、網絡、數據庫等", IsPublic: true, MaxUsers: 50, CreatedBy: "system", IsActive: true},
+		}
+
+		// 插入測試資料到真實資料庫
+		for _, room := range testRooms {
+			err := db.DB.Create(&room).Error
+			assert.NoError(t, err, "插入測試資料不應該失敗")
+		}
+
 		// 模擬獲取聊天室列表的請求
 		req, _ := http.NewRequest("GET", "/api/rooms", nil)
-
-		// 模擬 DB 行為
-		mockResult := new(repository.MockGormDB)
-		mockResult.Err = nil
-		rooms := []model.Room{
-			{ID: "test-room-1", Name: "公共聊天室", Description: "這是一個公開的聊天室，所有人都可以加入", CreatedAt: time.Now(), UpdatedAt: time.Now()},
-			{ID: "test-room-2", Name: "技術討論", Description: "討論各種技術話題，包括程式設計、網絡、數據庫等", CreatedAt: time.Now(), UpdatedAt: time.Now()},
-		}
-		db.On("Find", mock.AnythingOfType("*[]model.Room"), mock.Anything).Run(func(args mock.Arguments) {
-			roomsPtr := args.Get(0).(*[]model.Room)
-			*roomsPtr = rooms
-		}).Return(mockResult)
-		db.On("Where", mock.Anything, mock.Anything, mock.Anything).Return(db)
-		db.On("Count", mock.AnythingOfType("*int64")).Run(func(args mock.Arguments) {
-			countPtr := args.Get(0).(*int64)
-			*countPtr = 5
-		}).Return(mockResult)
 
 		// 執行請求
 		w := httptest.NewRecorder()
@@ -100,37 +91,37 @@ func TestMultiRoomIntegration(t *testing.T) {
 		var response []map[string]interface{}
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		assert.NoError(t, err, "應該能夠解析響應")
-		assert.Equal(t, 2, len(response), "應該有 2 個聊天室")
-		assert.Equal(t, "公共聊天室", response[0]["name"], "第一個聊天室的名稱應該匹配")
+		// 應該有至少 2 個聊天室（因為前面的測試可能已經創建了聊天室）
+		assert.GreaterOrEqual(t, len(response), 2, "應該有至少 2 個聊天室")
+
+		// 檢查我們創建的聊天室是否存在
+		roomNames := make([]string, len(response))
+		for i, room := range response {
+			roomNames[i] = room["name"].(string)
+		}
+		assert.Contains(t, roomNames, "公共聊天室", "應該包含公共聊天室")
+		assert.Contains(t, roomNames, "技術討論", "應該包含技術討論室")
 	})
 
 	// 測試獲取特定聊天室
 	t.Run("Get_Room", func(t *testing.T) {
-		// 模擬獲取特定聊天室的請求
-		req, _ := http.NewRequest("GET", "/api/rooms/1", nil)
-
-		// 模擬 DB 行為
-		mockResult := new(repository.MockGormDB)
-		mockResult.Err = nil
-		room := &model.Room{
-			ID:          "test-room-1",
-			CreatedAt:   time.Now(),
-			UpdatedAt:   time.Now(),
-			Name:        "測試聊天室",
-			Description: "這是一個測試聊天室",
+		// 先創建一個特定的聊天室供測試
+		testRoom := model.Room{
+			ID:          "test-get-room",
+			Name:        "特定測試聊天室",
+			Description: "這是獲取特定聊天室的測試",
 			IsPublic:    true,
 			MaxUsers:    100,
-			CreatedBy:   "user-123",
+			CreatedBy:   "system",
+			IsActive:    true,
 		}
-		db.On("First", mock.AnythingOfType("*model.Room"), mock.Anything).Run(func(args mock.Arguments) {
-			roomPtr := args.Get(0).(*model.Room)
-			*roomPtr = *room
-		}).Return(mockResult)
-		db.On("Where", mock.Anything, mock.Anything, mock.Anything).Return(db)
-		db.On("Count", mock.AnythingOfType("*int64")).Run(func(args mock.Arguments) {
-			countPtr := args.Get(0).(*int64)
-			*countPtr = 5
-		}).Return(mockResult)
+
+		// 插入測試資料到真實資料庫
+		err := db.DB.Create(&testRoom).Error
+		assert.NoError(t, err, "插入測試資料不應該失敗")
+
+		// 模擬獲取特定聊天室的請求
+		req, _ := http.NewRequest("GET", "/api/rooms/test-get-room", nil)
 
 		// 執行請求
 		w := httptest.NewRecorder()
@@ -139,10 +130,10 @@ func TestMultiRoomIntegration(t *testing.T) {
 		// 驗證結果
 		assert.Equal(t, http.StatusOK, w.Code, "應該返回 200 OK")
 		var response map[string]interface{}
-		err := json.Unmarshal(w.Body.Bytes(), &response)
+		err = json.Unmarshal(w.Body.Bytes(), &response)
 		assert.NoError(t, err, "應該能夠解析響應")
-		assert.Equal(t, "測試聊天室", response["name"], "聊天室名稱應該匹配")
-		assert.Equal(t, "這是一個測試聊天室", response["description"], "聊天室描述應該匹配")
+		assert.Equal(t, "特定測試聊天室", response["name"], "聊天室名稱應該匹配")
+		assert.Equal(t, "這是獲取特定聊天室的測試", response["description"], "聊天室描述應該匹配")
 	})
 
 	// 測試 WebSocket 連接和聊天室訊息

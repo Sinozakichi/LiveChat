@@ -25,6 +25,7 @@ type DB interface {
 	Order(value interface{}) *gorm.DB
 	Limit(limit int) *gorm.DB
 	Count(count *int64) *gorm.DB
+	Model(value interface{}) *gorm.DB
 }
 
 // NewRoomRepository 創建一個新的聊天室儲存庫
