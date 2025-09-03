@@ -87,10 +87,13 @@ func (m *MockDB) Create(value interface{}) *gorm.DB {
 // Save 模擬 GORM 的 Save 方法，用於更新記錄
 // 主要用於測試更新操作的流程
 func (m *MockDB) Save(value interface{}) *gorm.DB {
-	m.Called(value)
+	// 如果有真實的 DB 實例，直接使用真實的 Save 操作
 	if m.DB != nil {
-		return m.DB
+		return m.DB.Save(value)
 	}
+
+	// 否則使用 Mock 行為
+	m.Called(value)
 	return &gorm.DB{}
 }
 
@@ -205,31 +208,8 @@ func NewMockDB() *MockDB {
 		panic("failed to connect to test database")
 	}
 
-	// 創建混合型 MockDB 實例
-	mockDB := &MockDB{
-		Mock: mock.Mock{}, // 初始化 Mock 功能
-		DB:   db,          // 嵌入真實的 GORM 實例
-	}
-
-	return mockDB
-}
-
-// NewMockDBWithSchema 創建包含完整資料庫結構的測試資料庫
-//
-// 此函數專門用於需要真實資料庫操作的測試場景：
-// 1. 自動建立所有必要的資料表結構
-// 2. 支援完整的 GORM 關聯操作
-// 3. 提供真實的 SQL 查詢環境
-// 4. 適用於整合測試和複雜的資料庫操作測試
-func NewMockDBWithSchema() *MockDB {
-	// 創建記憶體資料庫
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	if err != nil {
-		panic("failed to connect to test database")
-	}
-
-	// 導入所有模型以便進行自動遷移
-	// 這確保了所有必要的資料表都會被創建
+	// 自動遷移所有必要的資料表結構
+	// 這樣 NewMockDB() 就可以支援完整的資料庫操作
 	err = db.AutoMigrate(
 		&model.User{},     // 使用者表
 		&model.Room{},     // 聊天室表
@@ -242,9 +222,19 @@ func NewMockDBWithSchema() *MockDB {
 
 	// 創建混合型 MockDB 實例
 	mockDB := &MockDB{
-		Mock: mock.Mock{},
-		DB:   db,
+		Mock: mock.Mock{}, // 初始化 Mock 功能
+		DB:   db,          // 嵌入真實的 GORM 實例
 	}
 
 	return mockDB
+}
+
+// NewMockDBWithSchema 創建包含完整資料庫結構的測試資料庫
+//
+// 注意：現在 NewMockDB() 已經包含完整的資料庫結構了，
+// 這個函數主要是為了向後兼容性而保留
+// 建議新的測試直接使用 NewMockDB()
+func NewMockDBWithSchema() *MockDB {
+	// 現在直接委託給 NewMockDB()
+	return NewMockDB()
 }

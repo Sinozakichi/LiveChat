@@ -3,10 +3,8 @@ package repository
 import (
 	"livechat/backend/model"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 )
 
 // 測試創建新的聊天室儲存庫
@@ -134,12 +132,11 @@ func TestGetAllRooms(t *testing.T) {
 
 // 測試創建聊天室
 func TestCreateRoom(t *testing.T) {
-	// 安排 (Arrange)
-	mockDB := NewMockDB()
-	mockResult := new(MockGormDB)
-	mockResult.Err = nil
+	// 安排 (Arrange) - 使用帶有完整結構的模擬資料庫
+	mockDB := NewMockDBWithSchema()
 
 	room := &model.Room{
+		ID:          "test-create-room",
 		Name:        "新聊天室",
 		Description: "這是一個新的聊天室",
 		IsPublic:    true,
@@ -148,9 +145,6 @@ func TestCreateRoom(t *testing.T) {
 		IsActive:    true,
 	}
 
-	// 設置模擬行為
-	mockDB.On("Create", mock.AnythingOfType("*model.Room")).Return(mockResult)
-
 	repo := NewRoomRepository(mockDB)
 
 	// 動作 (Act)
@@ -158,35 +152,47 @@ func TestCreateRoom(t *testing.T) {
 
 	// 斷言 (Assert)
 	assert.NoError(t, err, "創建聊天室不應該返回錯誤")
-	mockDB.AssertExpectations(t)
+
+	// 驗證房間是否真的被創建
+	createdRoom, err := repo.GetRoom(room.ID)
+	assert.NoError(t, err, "應該能獲取創建的聊天室")
+	assert.Equal(t, room.Name, createdRoom.Name, "聊天室名稱應該匹配")
 }
 
 // 測試更新聊天室
 func TestUpdateRoom(t *testing.T) {
-	// 安排 (Arrange)
-	mockDB := NewMockDB()
-	mockResult := new(MockGormDB)
-	mockResult.Err = nil
-
-	room := &model.Room{
-		ID:          "1",
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
-		Name:        "更新的聊天室",
-		Description: "這是一個更新的聊天室",
-	}
-
-	// 設置模擬行為
-	mockDB.On("Save", mock.AnythingOfType("*model.Room")).Return(mockResult)
-
+	// 安排 (Arrange) - 使用帶有完整結構的模擬資料庫
+	mockDB := NewMockDBWithSchema()
 	repo := NewRoomRepository(mockDB)
 
+	// 先創建一個聊天室
+	originalRoom := &model.Room{
+		ID:          "test-update-room",
+		Name:        "原始聊天室",
+		Description: "這是原始的聊天室",
+		IsPublic:    true,
+		MaxUsers:    100,
+		CreatedBy:   "system",
+		IsActive:    true,
+	}
+	err := repo.CreateRoom(originalRoom)
+	assert.NoError(t, err, "創建原始聊天室不應該失敗")
+
+	// 修改聊天室資訊
+	originalRoom.Name = "更新的聊天室"
+	originalRoom.Description = "這是一個更新的聊天室"
+
 	// 動作 (Act)
-	err := repo.UpdateRoom(room)
+	err = repo.UpdateRoom(originalRoom)
 
 	// 斷言 (Assert)
 	assert.NoError(t, err, "更新聊天室不應該返回錯誤")
-	mockDB.AssertExpectations(t)
+
+	// 驗證更新是否成功
+	updatedRoom, err := repo.GetRoom("test-update-room")
+	assert.NoError(t, err, "應該能獲取更新後的聊天室")
+	assert.Equal(t, "更新的聊天室", updatedRoom.Name, "聊天室名稱應該已更新")
+	assert.Equal(t, "這是一個更新的聊天室", updatedRoom.Description, "聊天室描述應該已更新")
 }
 
 // TestGetRoomUsers 測試獲取聊天室用戶功能
@@ -290,138 +296,122 @@ func TestGetRoomUsers(t *testing.T) {
 
 // 測試用戶加入聊天室
 func TestJoinRoom(t *testing.T) {
-	// 安排 (Arrange)
-	mockDB := NewMockDB()
-	mockResult := new(MockGormDB)
-	mockResult.Err = nil
-
-	// 設置模擬行為
-	mockDB.On("Create", mock.AnythingOfType("*model.RoomUser")).Return(mockResult)
-
+	// 安排 (Arrange) - 使用帶有完整結構的模擬資料庫
+	mockDB := NewMockDBWithSchema()
 	repo := NewRoomRepository(mockDB)
 
 	// 動作 (Act)
-	err := repo.JoinRoom("1", "user-123", "member")
+	err := repo.JoinRoom("test-room-1", "user-123", "member")
 
 	// 斷言 (Assert)
 	assert.NoError(t, err, "加入聊天室不應該返回錯誤")
-	mockDB.AssertExpectations(t)
+
+	// 驗證用戶是否真的加入了聊天室
+	users, err := repo.GetRoomUsers("test-room-1")
+	assert.NoError(t, err, "應該能獲取聊天室用戶")
+	assert.Len(t, users, 1, "聊天室應該有 1 個用戶")
+	assert.Equal(t, "user-123", users[0].UserID, "用戶 ID 應該匹配")
 }
 
 // 測試用戶離開聊天室
 func TestLeaveRoom(t *testing.T) {
-	// 安排 (Arrange)
-	mockDB := NewMockDB()
-	mockFirstResult := new(MockGormDB)
-	mockFirstResult.Err = nil
-	mockSaveResult := new(MockGormDB)
-	mockSaveResult.Err = nil
-
-	expectedRoomUser := &model.RoomUser{
-		RoomID:   "1",
-		UserID:   "user-123",
-		IsActive: true,
-	}
-
-	// 設置模擬行為
-	mockDB.On("Where", "room_id = ? AND user_id = ? AND is_active = ?", []interface{}{"1", "user-123", true}).Return(mockDB)
-	mockDB.On("First", mock.AnythingOfType("*model.RoomUser")).Run(func(args mock.Arguments) {
-		user := args.Get(0).(*model.RoomUser)
-		*user = *expectedRoomUser
-	}).Return(mockFirstResult)
-	mockDB.On("Save", mock.AnythingOfType("*model.RoomUser")).Return(mockSaveResult)
-
+	// 安排 (Arrange) - 使用帶有完整結構的模擬資料庫
+	mockDB := NewMockDBWithSchema()
 	repo := NewRoomRepository(mockDB)
 
-	// 動作 (Act)
-	err := repo.LeaveRoom("1", "user-123")
+	// 先讓用戶加入聊天室
+	err := repo.JoinRoom("test-room-1", "user-123", "member")
+	assert.NoError(t, err, "用戶應該能加入聊天室")
+
+	// 驗證用戶已加入
+	users, err := repo.GetRoomUsers("test-room-1")
+	assert.NoError(t, err, "應該能獲取聊天室用戶")
+	assert.Len(t, users, 1, "聊天室應該有 1 個用戶")
+
+	// 動作 (Act) - 用戶離開聊天室
+	err = repo.LeaveRoom("test-room-1", "user-123")
 
 	// 斷言 (Assert)
 	assert.NoError(t, err, "離開聊天室不應該返回錯誤")
-	mockDB.AssertExpectations(t)
+
+	// 驗證用戶已離開（變為非活躍狀態）
+	users, err = repo.GetRoomUsers("test-room-1")
+	assert.NoError(t, err, "應該能獲取聊天室用戶")
+	assert.Len(t, users, 0, "聊天室應該沒有活躍用戶")
 }
 
 // 測試獲取聊天室訊息
 func TestGetRoomMessages(t *testing.T) {
-	// 安排 (Arrange)
-	mockDB := NewMockDB()
-	mockResult := new(MockGormDB)
-	mockResult.Err = nil
-
-	expectedMessages := []model.Message{
-		{RoomID: "1", UserID: "user-1", Content: "訊息1"},
-		{RoomID: "1", UserID: "user-2", Content: "訊息2"},
-	}
-
-	// 設置模擬行為
-	mockDB.On("Where", "room_id = ?", []interface{}{"1"}).Return(mockDB)
-	mockDB.On("Order", "created_at desc").Return(mockDB)
-	mockDB.On("Limit", 50).Return(mockDB)
-	mockDB.On("Find", mock.AnythingOfType("*[]model.Message")).Run(func(args mock.Arguments) {
-		messages := args.Get(0).(*[]model.Message)
-		*messages = expectedMessages
-	}).Return(mockResult)
-
+	// 安排 (Arrange) - 使用帶有完整結構的模擬資料庫
+	mockDB := NewMockDBWithSchema()
 	repo := NewRoomRepository(mockDB)
 
+	// 先插入測試訊息
+	testMessages := []model.Message{
+		{RoomID: "test-room-1", UserID: "user-1", Content: "訊息1"},
+		{RoomID: "test-room-1", UserID: "user-2", Content: "訊息2"},
+	}
+
+	for _, msg := range testMessages {
+		err := mockDB.DB.Create(&msg).Error
+		assert.NoError(t, err, "插入測試訊息不應該失敗")
+	}
+
 	// 動作 (Act)
-	messages, err := repo.GetRoomMessages("1", 50)
+	messages, err := repo.GetRoomMessages("test-room-1", 50)
 
 	// 斷言 (Assert)
 	assert.NoError(t, err, "獲取聊天室訊息不應該返回錯誤")
 	assert.Equal(t, 2, len(messages), "應該有 2 條訊息")
-	assert.Equal(t, "訊息1", messages[0].Content, "第一條訊息的內容應該匹配")
-	mockDB.AssertExpectations(t)
+
+	// 驗證訊息內容（注意 GORM 預設按 created_at desc 排序，所以順序可能相反）
+	messageContents := []string{messages[0].Content, messages[1].Content}
+	assert.Contains(t, messageContents, "訊息1", "應該包含訊息1")
+	assert.Contains(t, messageContents, "訊息2", "應該包含訊息2")
 }
 
 // 測試保存訊息
 func TestSaveMessage(t *testing.T) {
-	// 安排 (Arrange)
-	mockDB := NewMockDB()
-	mockResult := new(MockGormDB)
-	mockResult.Err = nil
+	// 安排 (Arrange) - 使用帶有完整結構的模擬資料庫
+	mockDB := NewMockDBWithSchema()
+	repo := NewRoomRepository(mockDB)
 
 	message := &model.Message{
-		RoomID:  "1",
+		RoomID:  "test-room-1",
 		UserID:  "user-123",
 		Content: "Hello, World!",
 	}
-
-	// 設置模擬行為
-	mockDB.On("Create", mock.AnythingOfType("*model.Message")).Return(mockResult)
-
-	repo := NewRoomRepository(mockDB)
 
 	// 動作 (Act)
 	err := repo.SaveMessage(message)
 
 	// 斷言 (Assert)
 	assert.NoError(t, err, "保存訊息不應該返回錯誤")
-	mockDB.AssertExpectations(t)
+
+	// 驗證訊息是否真的被保存
+	messages, err := repo.GetRoomMessages("test-room-1", 50)
+	assert.NoError(t, err, "應該能獲取聊天室訊息")
+	assert.Len(t, messages, 1, "聊天室應該有 1 條訊息")
+	assert.Equal(t, "Hello, World!", messages[0].Content, "訊息內容應該匹配")
 }
 
 // 測試計算活躍用戶數
 func TestCountActiveUsers(t *testing.T) {
-	// 安排 (Arrange)
-	mockDB := NewMockDB()
-	mockWhereResult := mockDB
-	mockResult := new(MockGormDB)
-	mockResult.Err = nil
-
-	// 設置模擬行為
-	mockDB.On("Where", "room_id = ? AND is_active = ?", []interface{}{"1", true}).Return(mockWhereResult)
-	mockDB.On("Count", mock.AnythingOfType("*int64")).Run(func(args mock.Arguments) {
-		count := args.Get(0).(*int64)
-		*count = 5
-	}).Return(mockResult)
-
+	// 安排 (Arrange) - 使用帶有完整結構的模擬資料庫
+	mockDB := NewMockDBWithSchema()
 	repo := NewRoomRepository(mockDB)
 
+	// 先讓一些用戶加入聊天室
+	testUsers := []string{"user-1", "user-2", "user-3", "user-4", "user-5"}
+	for _, userID := range testUsers {
+		err := repo.JoinRoom("test-room-1", userID, "member")
+		assert.NoError(t, err, "用戶應該能加入聊天室")
+	}
+
 	// 動作 (Act)
-	count, err := repo.CountActiveUsers("1")
+	count, err := repo.CountActiveUsers("test-room-1")
 
 	// 斷言 (Assert)
 	assert.NoError(t, err, "計算活躍用戶數不應該返回錯誤")
-	assert.Equal(t, int64(5), count, "活躍用戶數應該匹配")
-	mockDB.AssertExpectations(t)
+	assert.Equal(t, int64(5), count, "活躍用戶數應該是 5")
 }

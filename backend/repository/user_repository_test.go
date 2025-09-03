@@ -90,34 +90,31 @@ func TestCreateUser(t *testing.T) {
 // - 驗證特定的錯誤類型，而非通用錯誤
 // - 測試負面情況（錯誤路徑）
 func TestCreateUserUsernameExists(t *testing.T) {
-	// 安排 (Arrange)：準備錯誤情況的測試環境
+	// 安排 (Arrange) - 使用帶有完整結構的模擬資料庫
 	mockDB := NewMockDB()
-	mockResult := new(MockGormDB)
-	mockResult.Err = nil
-
-	// 設置模擬行為：模擬發現重複的使用者名稱
-	mockDB.On("Model", mock.AnythingOfType("*model.User")).Return(mockDB)
-	mockDB.On("Where", "username = ?", []interface{}{"existinguser"}).Return(mockDB)
-	// 使用 Run 函數動態設定計數值，模擬找到 1 個重複的使用者名稱
-	mockDB.On("Count", mock.AnythingOfType("*int64")).Run(func(args mock.Arguments) {
-		count := args.Get(0).(*int64)
-		*count = 1 // 模擬找到重複的使用者名稱
-	}).Return(mockResult)
-
-	// 創建儲存庫和測試用戶資料
 	repo := NewUserRepository(mockDB)
-	user := &model.User{
-		Username: "existinguser", // 模擬已存在的使用者名稱
-		Email:    "test@example.com",
+
+	// 先創建一個已存在的用戶
+	existingUser := &model.User{
+		Username: "existinguser",
+		Email:    "existing@example.com",
 		Password: "password123",
 	}
+	err := repo.CreateUser(existingUser)
+	assert.NoError(t, err, "創建第一個用戶不應該失敗")
 
-	// 動作 (Act)：執行創建操作，期望失敗
-	err := repo.CreateUser(user)
+	// 創建具有相同用戶名的新用戶資料
+	newUser := &model.User{
+		Username: "existinguser",          // 相同的使用者名稱
+		Email:    "different@example.com", // 不同的郵箱
+		Password: "password456",
+	}
+
+	// 動作 (Act)：嘗試創建具有重複用戶名的用戶
+	err = repo.CreateUser(newUser)
 
 	// 斷言 (Assert)：驗證錯誤處理
 	assert.Error(t, err, "創建已存在用戶名的用戶應返回錯誤")
-	// 驗證回傳的是特定的錯誤類型，而非通用錯誤
 	assert.Equal(t, ErrUserAlreadyExists, err, "錯誤應為 ErrUserAlreadyExists")
 }
 
@@ -135,41 +132,31 @@ func TestCreateUserUsernameExists(t *testing.T) {
 // - 驗證系統能區分不同類型的重複錯誤
 // - 測試多層驗證邏輯
 func TestCreateUserEmailExists(t *testing.T) {
-	// 安排 (Arrange)：準備複雜的錯誤情況測試環境
+	// 安排 (Arrange) - 使用帶有完整結構的模擬資料庫
 	mockDB := NewMockDB()
-	mockResult := new(MockGormDB)
-	mockResult.Err = nil
-
-	// 設置複雜的模擬行為：模擬使用者名稱不重複，但電子郵件重複的情況
-	mockDB.On("Model", mock.AnythingOfType("*model.User")).Return(mockDB)
-	mockDB.On("Where", "username = ?", []interface{}{"newuser"}).Return(mockDB)
-	// 第一次 Count 調用：檢查使用者名稱，回傳 0（不重複）
-	mockDB.On("Count", mock.AnythingOfType("*int64")).Run(func(args mock.Arguments) {
-		count := args.Get(0).(*int64)
-		*count = 0 // 使用者名稱不存在，通過第一層檢查
-	}).Return(mockResult).Once() // 使用 Once() 確保這個行為只用於第一次調用
-
-	mockDB.On("Where", "email = ?", []interface{}{"existing@example.com"}).Return(mockDB)
-	// 第二次 Count 調用：檢查電子郵件，回傳 1（重複）
-	mockDB.On("Count", mock.AnythingOfType("*int64")).Run(func(args mock.Arguments) {
-		count := args.Get(0).(*int64)
-		*count = 1 // 電子郵件存在，觸發錯誤
-	}).Return(mockResult).Once()
-
-	// 創建儲存庫和測試用戶資料
 	repo := NewUserRepository(mockDB)
-	user := &model.User{
-		Username: "newuser",              // 新的使用者名稱（不重複）
-		Email:    "existing@example.com", // 已存在的電子郵件（重複）
+
+	// 先創建一個已存在的用戶
+	existingUser := &model.User{
+		Username: "originaluser",
+		Email:    "existing@example.com",
 		Password: "password123",
 	}
+	err := repo.CreateUser(existingUser)
+	assert.NoError(t, err, "創建第一個用戶不應該失敗")
 
-	// 動作 (Act)：執行創建操作，期望因電子郵件重複而失敗
-	err := repo.CreateUser(user)
+	// 創建具有相同郵箱的新用戶資料
+	newUser := &model.User{
+		Username: "newuser",              // 不同的使用者名稱
+		Email:    "existing@example.com", // 相同的電子郵件
+		Password: "password456",
+	}
+
+	// 動作 (Act)：嘗試創建具有重複郵箱的用戶
+	err = repo.CreateUser(newUser)
 
 	// 斷言 (Assert)：驗證錯誤處理
 	assert.Error(t, err, "創建已存在電子郵件的用戶應返回錯誤")
-	// 驗證回傳的是電子郵件重複的特定錯誤，而非使用者名稱錯誤
 	assert.Equal(t, ErrEmailAlreadyExists, err, "錯誤應為 ErrEmailAlreadyExists")
 }
 
@@ -187,40 +174,34 @@ func TestCreateUserEmailExists(t *testing.T) {
 // - 驗證多個欄位以確保資料完整性
 // - 測試成功的查詢路徑
 func TestGetUserByID(t *testing.T) {
-	// 安排 (Arrange)：準備查詢測試環境
+	// 安排 (Arrange) - 使用帶有完整結構的模擬資料庫
 	mockDB := NewMockDB()
-	mockResult := new(MockGormDB)
-	mockResult.Err = nil
-
-	// 創建期望的使用者資料，包含所有重要欄位
-	expectedUser := &model.User{
-		ID:        "1",
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-		Username:  "testuser",
-		Email:     "test@example.com",
-		Password:  "hashedpassword", // 注意：這應該是已加密的密碼
-		Role:      "user",
-	}
-
-	// 設置模擬行為：模擬成功的資料庫查詢
-	// 使用 Run 函數將預期的使用者資料寫入到查詢結果中
-	mockDB.On("First", mock.AnythingOfType("*model.User"), "id = ?", "1").Run(func(args mock.Arguments) {
-		user := args.Get(0).(*model.User)
-		*user = *expectedUser // 將期望的資料複製到查詢結果中
-	}).Return(mockResult)
-
 	repo := NewUserRepository(mockDB)
 
-	// 動作 (Act)：執行 ID 查詢
-	user, err := repo.GetUserByID("1")
+	// 先創建一個測試用戶
+	testUser := &model.User{
+		Username: "testuser",
+		Email:    "test@example.com",
+		Password: "password123",
+		Role:     "user",
+	}
+	err := repo.CreateUser(testUser)
+	assert.NoError(t, err, "創建測試用戶不應該失敗")
+
+	// 獲取剛創建用戶的 ID（因為是自動生成的）
+	createdUser, err := repo.GetUserByUsername("testuser")
+	assert.NoError(t, err, "應該能根據用戶名查找用戶")
+	assert.NotNil(t, createdUser, "創建的用戶不應為空")
+
+	// 動作 (Act)：根據 ID 查詢用戶
+	user, err := repo.GetUserByID(createdUser.ID)
 
 	// 斷言 (Assert)：驗證查詢結果
 	assert.NoError(t, err, "獲取用戶不應返回錯誤")
 	assert.NotNil(t, user, "用戶不應為 nil")
-	// 驗證關鍵欄位的正確性
-	assert.Equal(t, "1", user.ID, "用戶 ID 應該匹配")
+	assert.Equal(t, createdUser.ID, user.ID, "用戶 ID 應該匹配")
 	assert.Equal(t, "testuser", user.Username, "用戶名應該匹配")
+	assert.Equal(t, "test@example.com", user.Email, "郵箱應該匹配")
 }
 
 // TestGetUserByUsername 測試根據使用者名稱查詢使用者的功能
@@ -237,37 +218,28 @@ func TestGetUserByID(t *testing.T) {
 // - 驗證回傳的使用者資料正確性
 // - 專注於測試查詢條件和結果映射
 func TestGetUserByUsername(t *testing.T) {
-	// 安排 (Arrange)：準備使用者名稱查詢的測試環境
+	// 安排 (Arrange) - 使用帶有完整結構的模擬資料庫
 	mockDB := NewMockDB()
-	mockResult := new(MockGormDB)
-	mockResult.Err = nil
-
-	// 創建期望的使用者資料
-	expectedUser := &model.User{
-		ID:        "1",
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-		Username:  "testuser",
-		Email:     "test@example.com",
-		Password:  "hashedpassword",
-		Role:      "user",
-	}
-
-	// 設置模擬行為：模擬根據使用者名稱的查詢
-	mockDB.On("First", mock.AnythingOfType("*model.User"), "username = ?", "testuser").Run(func(args mock.Arguments) {
-		user := args.Get(0).(*model.User)
-		*user = *expectedUser // 將期望的資料複製到查詢結果
-	}).Return(mockResult)
-
 	repo := NewUserRepository(mockDB)
 
-	// 動作 (Act)：執行使用者名稱查詢
+	// 先創建一個測試用戶
+	testUser := &model.User{
+		Username: "testuser",
+		Email:    "test@example.com",
+		Password: "password123",
+		Role:     "user",
+	}
+	err := repo.CreateUser(testUser)
+	assert.NoError(t, err, "創建測試用戶不應該失敗")
+
+	// 動作 (Act)：根據用戶名查詢用戶
 	user, err := repo.GetUserByUsername("testuser")
 
 	// 斷言 (Assert)：驗證查詢結果
 	assert.NoError(t, err, "獲取用戶不應返回錯誤")
 	assert.NotNil(t, user, "用戶不應為 nil")
 	assert.Equal(t, "testuser", user.Username, "用戶名應該匹配")
+	assert.Equal(t, "test@example.com", user.Email, "郵箱應該匹配")
 }
 
 // TestCheckUserCredentials 測試使用者登入憑證驗證功能
@@ -284,39 +256,28 @@ func TestGetUserByUsername(t *testing.T) {
 // - 測試正確的使用者名稱和密碼組合
 // - 驗證回傳的使用者資料正確性
 func TestCheckUserCredentials(t *testing.T) {
-	// 安排 (Arrange)：準備憑證驗證的測試環境
+	// 安排 (Arrange) - 使用帶有完整結構的模擬資料庫
 	mockDB := NewMockDB()
-	mockResult := new(MockGormDB)
-	mockResult.Err = nil
-
-	// 創建真實的加密密碼，確保測試的真實性
-	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte("password123"), bcrypt.DefaultCost)
-
-	expectedUser := &model.User{
-		ID:        "1",
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
-		Username:  "testuser",
-		Email:     "test@example.com",
-		Password:  string(hashedPassword), // 使用真實加密的密碼
-		Role:      "user",
-	}
-
-	// 設置模擬行為：模擬使用者查詢
-	mockDB.On("First", mock.AnythingOfType("*model.User"), "username = ?", "testuser").Run(func(args mock.Arguments) {
-		user := args.Get(0).(*model.User)
-		*user = *expectedUser
-	}).Return(mockResult)
-
 	repo := NewUserRepository(mockDB)
 
-	// 動作 (Act)：執行憑證驗證，使用正確的密碼
+	// 先創建一個測試用戶（會自動進行密碼加密）
+	testUser := &model.User{
+		Username: "testuser",
+		Email:    "test@example.com",
+		Password: "password123",
+		Role:     "user",
+	}
+	err := repo.CreateUser(testUser)
+	assert.NoError(t, err, "創建測試用戶不應該失敗")
+
+	// 動作 (Act)：使用正確的憑證進行驗證
 	user, err := repo.CheckUserCredentials("testuser", "password123")
 
 	// 斷言 (Assert)：驗證成功的憑證驗證
 	assert.NoError(t, err, "檢查有效憑證不應返回錯誤")
 	assert.NotNil(t, user, "用戶不應為 nil")
 	assert.Equal(t, "testuser", user.Username, "用戶名應該匹配")
+	assert.Equal(t, "test@example.com", user.Email, "郵箱應該匹配")
 }
 
 // TestCheckUserCredentialsInvalidPassword 測試無效密碼的錯誤處理

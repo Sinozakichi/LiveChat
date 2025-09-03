@@ -161,7 +161,7 @@ func (r *RoomRepository) SaveMessage(message *model.Message) error {
 func (r *RoomRepository) CountActiveUsers(roomID string) (int64, error) {
 	var count int64
 
-	result := r.db.Where("room_id = ? AND is_active = ?", roomID, true).Count(&count)
+	result := r.db.Model(&model.RoomUser{}).Where("room_id = ? AND is_active = ?", roomID, true).Count(&count)
 	if result.Error != nil {
 		return 0, result.Error
 	}
